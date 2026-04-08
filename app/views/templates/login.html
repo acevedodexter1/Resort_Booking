@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+{% block title %}Login — Paradise Resort{% endblock %}
+{% block body %}
+<div class="auth-page">
+  <div class="auth-bg" style="background-image:url('{{ url_for('static',filename='images/welcome.jpg') }}')"></div>
+  <div class="auth-overlay"></div>
+  <a href="{{ url_for('auth.index') }}" class="back-btn">← Back</a>
+
+  <div class="auth-box">
+    <div class="auth-box-logo">🌴</div>
+    <h1 class="auth-box-title">Paradise Resort</h1>
+    <p class="auth-box-sub">One account for guests and admins</p>
+
+    <div class="auth-tabs">
+      <button type="button" class="auth-tab active" id="tabLogin">Sign In</button>
+      <button type="button" class="auth-tab" id="tabRegister">Create Account</button>
+    </div>
+
+    <!-- LOGIN -->
+    <div id="loginSection">
+      <form id="loginForm" novalidate autocomplete="on">
+        <div class="field-group">
+          <label class="field-label">Username</label>
+          <div class="field-row">
+            <span class="field-ico">👤</span>
+            <input id="loginUser" type="text" class="field-inp" placeholder="Enter your username" autocomplete="username" autocapitalize="none" spellcheck="false"/>
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Password</label>
+          <div class="field-row">
+            <span class="field-ico">🔒</span>
+            <input id="loginPass" type="password" class="field-inp" placeholder="Enter your password" autocomplete="current-password"/>
+            <button type="button" class="eye-toggle" id="eyeLogin">👁</button>
+          </div>
+        </div>
+        <div id="loginErr" class="err-box" style="display:none"></div>
+        <button type="submit" id="loginBtn" class="btn btn-primary btn-full btn-lg">
+          <span class="btn-label">Sign In</span>
+          <span class="btn-spin" style="display:none">⏳ Signing in…</span>
+        </button>
+      </form>
+      <p class="auth-note">🔐 Your role (guest or admin) is automatically detected.</p>
+    </div>
+
+    <!-- REGISTER -->
+    <div id="registerSection" style="display:none">
+      <form id="registerForm" novalidate autocomplete="on">
+        <div class="field-group">
+          <label class="field-label">Username <span class="req">*</span></label>
+          <div class="field-row">
+            <span class="field-ico">👤</span>
+            <input id="regUser" type="text" class="field-inp" placeholder="Min. 3 characters" autocomplete="username" autocapitalize="none" spellcheck="false"/>
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Email <span style="color:var(--t1);font-weight:400">(optional — for booking receipts)</span></label>
+          <div class="field-row">
+            <span class="field-ico">📧</span>
+            <input id="regEmail" type="email" class="field-inp" placeholder="your@email.com" autocomplete="email"/>
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Password <span class="req">*</span></label>
+          <div class="field-row">
+            <span class="field-ico">🔒</span>
+            <input id="regPass" type="password" class="field-inp" placeholder="Min. 6 characters" autocomplete="new-password"/>
+            <button type="button" class="eye-toggle" id="eyeReg">👁</button>
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Confirm Password <span class="req">*</span></label>
+          <div class="field-row">
+            <span class="field-ico">✅</span>
+            <input id="regConfirm" type="password" class="field-inp" placeholder="Repeat your password" autocomplete="new-password"/>
+          </div>
+        </div>
+        <div id="regErr" class="err-box" style="display:none"></div>
+        <button type="submit" id="regBtn" class="btn btn-primary btn-full btn-lg">
+          <span class="btn-label">Create Account</span>
+          <span class="btn-spin" style="display:none">⏳ Registering…</span>
+        </button>
+      </form>
+      <p class="auth-note">✅ Free to join. Only letters, numbers & underscores in username.</p>
+    </div>
+  </div>
+</div>
+<script>
+window.CSRF         = '{{ csrf_token() }}';
+window.LOGIN_URL    = '{{ url_for("auth.login") }}';
+window.REGISTER_URL = '{{ url_for("auth.register") }}';
+</script>
+{% endblock %}

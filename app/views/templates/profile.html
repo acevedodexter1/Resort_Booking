@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% block title %}My Profile — Paradise Resort{% endblock %}
+{% block body %}
+<div class="app">
+  <div class="sb-backdrop" id="sbBackdrop"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-top"><div class="sb-brand">🌴 Paradise</div><button class="sb-close" id="sbClose" type="button">✕</button></div>
+    <nav class="sb-nav">
+      <a href="{{ url_for('guest.dashboard') }}" class="sb-link"><span>🏖️</span> Accommodations</a>
+      <a href="{{ url_for('guest.my_bookings') }}" class="sb-link"><span>📋</span> My Bookings</a>
+      <a href="{{ url_for('auth.profile') }}" class="sb-link active"><span>👤</span> My Profile</a>
+    </nav>
+    <div class="sb-footer">
+      <button class="theme-toggle" id="themeToggle" type="button">🌙 Dark Mode</button>
+      <div class="sb-user">
+        <div class="sb-avatar">{{ user.username[0].upper() if user.username else '?' }}</div>
+        <div class="sb-user-info"><strong>{{ user.username }}</strong><small>Guest Account</small></div>
+      </div>
+      <a href="{{ url_for('auth.logout') }}" class="btn btn-danger btn-sm btn-full">🚪 Logout</a>
+    </div>
+  </aside>
+
+  <div class="app-main">
+    <header class="app-header">
+      <button class="hamburger" id="menuBtn" type="button"><span></span><span></span><span></span></button>
+      <div class="app-header-info"><h1>My <em>Profile</em></h1><p>Manage your account settings</p></div>
+    </header>
+    <div class="page-body">
+      <div class="profile-grid">
+
+        <!-- Account Info -->
+        <div class="a-card">
+          <div class="a-card-head"><h3>👤 Account Info</h3></div>
+          <div class="a-card-body">
+            <div class="profile-info-row"><span>Username</span><strong>{{ user.username }}</strong></div>
+            <div class="profile-info-row"><span>Role</span><strong>{{ user.role|title }}</strong></div>
+            <div class="profile-info-row"><span>Member Since</span><strong>{{ user.created_at[:10] if user.created_at else '—' }}</strong></div>
+
+            <hr style="border:none;border-top:1px solid var(--border);margin:1.25rem 0"/>
+            <h4 style="margin-bottom:1rem;font-size:.95rem">📧 Update Email</h4>
+            <form id="emailForm" novalidate>
+              <div class="field-group">
+                <label class="field-label">Email Address <span style="color:var(--t1);font-weight:400">(for booking receipts)</span></label>
+                <div class="field-row">
+                  <span class="field-ico">📧</span>
+                  <input id="emailInput" type="email" class="field-inp" value="{{ user.email or '' }}" placeholder="your@email.com"/>
+                </div>
+              </div>
+              <div id="emailErr" class="err-box" style="display:none"></div>
+              <button type="submit" id="emailBtn" class="btn btn-primary">
+                <span class="btn-label">Update Email</span>
+                <span class="btn-spin" style="display:none">⏳</span>
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Change Password -->
+        <div class="a-card">
+          <div class="a-card-head"><h3>🔒 Change Password</h3></div>
+          <div class="a-card-body">
+            <form id="pwForm" novalidate>
+              <div class="field-group">
+                <label class="field-label">Current Password</label>
+                <div class="field-row">
+                  <span class="field-ico">🔒</span>
+                  <input id="currentPw" type="password" class="field-inp" placeholder="Your current password" autocomplete="current-password"/>
+                  <button type="button" class="eye-toggle" id="eyeCurrent">👁</button>
+                </div>
+              </div>
+              <div class="field-group">
+                <label class="field-label">New Password</label>
+                <div class="field-row">
+                  <span class="field-ico">🔑</span>
+                  <input id="newPw" type="password" class="field-inp" placeholder="Min. 6 characters" autocomplete="new-password"/>
+                  <button type="button" class="eye-toggle" id="eyeNew">👁</button>
+                </div>
+              </div>
+              <div class="field-group">
+                <label class="field-label">Confirm New Password</label>
+                <div class="field-row">
+                  <span class="field-ico">✅</span>
+                  <input id="confirmPw" type="password" class="field-inp" placeholder="Repeat new password" autocomplete="new-password"/>
+                </div>
+              </div>
+              <div id="pwErr" class="err-box" style="display:none"></div>
+              <button type="submit" id="pwBtn" class="btn btn-primary">
+                <span class="btn-label">Change Password</span>
+                <span class="btn-spin" style="display:none">⏳</span>
+              </button>
+            </form>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+window.CSRF         = '{{ csrf_token() }}';
+window.PROFILE_URL  = '{{ url_for("auth.profile") }}';
+</script>
+{% endblock %}

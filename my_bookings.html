@@ -1,0 +1,459 @@
+{% extends 'base.html' %}
+{% block title %}My Bookings — Paradise Resort{% endblock %}
+{% block body %}
+<div class="app">
+  <div class="sb-backdrop" id="sbBackdrop"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-top"><div class="sb-brand">🌴 Paradise</div><button class="sb-close" id="sbClose" type="button">✕</button></div>
+    <nav class="sb-nav">
+      <a href="{{ url_for('guest.dashboard') }}" class="sb-link"><span>🏖️</span> Accommodations</a>
+      <a href="{{ url_for('guest.my_bookings') }}" class="sb-link active"><span>📋</span> My Bookings</a>
+      <a href="{{ url_for('auth.profile') }}" class="sb-link"><span>👤</span> My Profile</a>
+    </nav>
+    <div class="sb-footer">
+      <button class="theme-toggle" id="themeToggle" type="button">🌙 Dark Mode</button>
+      <div class="sb-user">
+        <div class="sb-avatar">{{ user[0].upper() }}</div>
+        <div class="sb-user-info"><strong>{{ user }}</strong><small>Guest Account</small></div>
+      </div>
+      <a href="{{ url_for('auth.logout') }}" class="btn btn-danger btn-sm btn-full">🚪 Logout</a>
+    </div>
+  </aside>
+
+  <div class="app-main">
+    <header class="app-header">
+      <button class="hamburger" id="menuBtn" type="button"><span></span><span></span><span></span></button>
+      <div class="app-header-info">
+        <h1>My <em>Bookings</em></h1>
+        <p>{{ bookings|length }} reservation{{ 's' if bookings|length != 1 }}</p>
+      </div>
+    </header>
+
+    <div class="page-body">
+      {% if not bookings %}
+      <div class="no-results">
+        <p>🏖️</p><h3>No bookings yet!</h3>
+        <p>Start planning your paradise getaway.</p>
+        <a href="{{ url_for('guest.dashboard') }}" class="btn btn-primary" style="margin-top:1.25rem">Browse Accommodations →</a>
+      </div>
+      {% else %}
+      <div class="booking-list">
+        {% for b in bookings %}
+        <div class="bk-row {% if b.status == 'cancelled' %}bk-cancelled{% endif %}" id="bk-{{ b.id }}">
+          <img class="bk-img" src="{{ url_for('static', filename='images/' + b.image_path) }}" alt="{{ b.cottage_name }}" loading="lazy" onerror="this.src='{{ url_for('static', filename='images/welcome.jpg') }}'"/>
+          <div class="bk-info">
+            <h4>{{ b.cottage_name }}</h4>
+            <div class="bk-meta">
+              <span>📅 {{ b.date }}</span>
+              <span>🕐 {{ 'Day Tour' if 'Day' in b.shift else 'Night Tour' }}</span>
+              <span>💳 {{ b.payment_method|title }}</span>
+            </div>
+            {% if b.reference_no %}<p class="bk-ref">Ref: {{ b.reference_no }}</p>{% endif %}
+
+            {# ── Cancellation + refund info (visible only on cancelled bookings) ── #}
+            {% if b.status == 'cancelled' and b.cancelled_at %}
+            <div class="bk-cancel-info">
+              <span class="bk-cancel-ts">🕓 Cancelled {{ b.cancelled_at[:16] }} UTC</span>
+              {% if b.refund_status == 'full' %}
+                <span class="refund-badge refund-full">✅ Full Refund — ₱{{ '{:,.2f}'.format(b.refund_amount) }}</span>
+              {% elif b.refund_status == 'partial' %}
+                <span class="refund-badge refund-partial">⚠️ Partial Refund — ₱{{ '{:,.2f}'.format(b.refund_amount) }}</span>
+              {% elif b.refund_status == 'none' %}
+                <span class="refund-badge refund-none">❌ No Refund</span>
+              {% endif %}
+            </div>
+            {% endif %}
+          </div>
+          <div class="bk-right">
+            <div class="bk-total">₱{{ '{:,.0f}'.format(b.total_price) }}</div>
+            <span class="bk-badge bk-{{ b.status }}">{{ b.status|title }}</span>
+            {% if b.status == 'confirmed' %}
+            <div class="bk-actions">
+              <button type="button" class="btn btn-outline btn-sm reschedule-btn"
+                      data-id="{{ b.id }}"
+                      data-cottage="{{ b.cottage_name }}"
+                      data-cid="{{ b.cottage_id }}"
+                      data-date="{{ b.date }}"
+                      data-shift="{{ b.shift }}"
+                      data-price="{{ b.total_price }}">
+                📅 Reschedule
+              </button>
+              <button type="button" class="btn btn-danger btn-sm cancel-btn"
+                      data-id="{{ b.id }}"
+                      data-url="{{ url_for('guest.cancel_booking', rid=b.id) }}"
+                      data-preview-url="{{ url_for('guest.cancel_preview', rid=b.id) }}">
+                Cancel
+              </button>
+            </div>
+            {% endif %}
+            {% if b.status == 'confirmed' and not b.has_review %}
+            <button type="button" class="btn btn-ghost btn-sm review-btn"
+                    data-id="{{ b.id }}"
+                    data-cottage="{{ b.cottage_name }}">
+              ⭐ Leave Review
+            </button>
+            {% elif b.has_review %}
+            <span style="font-size:.75rem;color:var(--g2)">✅ Reviewed</span>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     CANCEL CONFIRMATION MODAL  (with refund policy breakdown)
+════════════════════════════════════════════════════════════════ -->
+<div class="modal-bg" id="cancelModal">
+  <div class="modal-box" style="max-width:480px">
+    <h3 style="margin-bottom:.25rem">🗑️ Cancel Booking</h3>
+    <p style="color:var(--t1);font-size:.88rem;margin-bottom:1.25rem">
+      Are you sure you want to cancel this reservation?
+    </p>
+
+    <!-- Loading state -->
+    <div id="cancelLoading" style="text-align:center;padding:1.5rem 0;color:var(--t1)">
+      ⏳ Checking refund eligibility…
+    </div>
+
+    <!-- Refund summary (shown after preview loads) -->
+    <div id="cancelRefundInfo" style="display:none">
+
+      <!-- Current refund tier highlight -->
+      <div id="cancelRefundHighlight" class="refund-highlight"></div>
+
+      <!-- Policy table -->
+      <table class="policy-table">
+        <thead>
+          <tr>
+            <th>Cancellation Window</th>
+            <th>Refund</th>
+            <th>Amount</th>
+          </tr>
+        </thead>
+        <tbody id="policyTableBody"></tbody>
+      </table>
+
+      <p style="font-size:.78rem;color:var(--t1);margin-top:.75rem">
+        ⚡ Refund eligibility is based on the time of cancellation relative to your check-in date.<br>
+        Refunds are processed within 5–7 business days.
+      </p>
+    </div>
+
+    <div id="cancelErr" class="err-box" style="display:none"></div>
+
+    <div style="display:flex;gap:.75rem;margin-top:1.25rem">
+      <button type="button" id="cancelConfirmBtn" class="btn btn-danger" style="flex:1" disabled>
+        <span class="btn-label">Yes, Cancel Booking</span>
+        <span class="btn-spin" style="display:none">⏳</span>
+      </button>
+      <button type="button" id="cancelCloseBtn" class="btn btn-ghost" style="flex:1">Keep Booking</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reschedule Modal -->
+<div class="modal-bg" id="rescheduleModal">
+  <div class="modal-box">
+    <h3 style="margin-bottom:1rem">📅 Reschedule Booking</h3>
+    <p id="rescheduleTitle" style="color:var(--t1);margin-bottom:1.25rem;font-size:.9rem"></p>
+    <div class="field-group">
+      <label class="field-label">New Date</label>
+      <input type="date" id="newDate" class="field-inp"/>
+    </div>
+    <div class="field-group">
+      <label class="field-label">New Shift</label>
+      <select id="newShift" class="field-inp">
+        <option value="Day Tour (8am-5pm)">Day Tour (8am–5pm)</option>
+        <option value="Night Tour (6pm-12mn)">Night Tour (6pm–12mn) +₱500</option>
+      </select>
+    </div>
+    <div id="rescheduleErr" class="err-box" style="display:none"></div>
+    <div style="display:flex;gap:.75rem;margin-top:1rem">
+      <button type="button" id="rescheduleConfirm" class="btn btn-primary" style="flex:1">
+        <span class="btn-label">Confirm Reschedule</span>
+        <span class="btn-spin" style="display:none">⏳</span>
+      </button>
+      <button type="button" id="rescheduleClose" class="btn btn-ghost" style="flex:1">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Review Modal -->
+<div class="modal-bg" id="reviewModal">
+  <div class="modal-box">
+    <h3 style="margin-bottom:.5rem">⭐ Leave a Review</h3>
+    <p id="reviewTitle" style="color:var(--t1);margin-bottom:1.25rem;font-size:.9rem"></p>
+    <div class="field-group">
+      <label class="field-label">Rating</label>
+      <div class="star-picker" id="starPicker">
+        {% for i in range(1,6) %}
+        <button type="button" class="star-btn" data-val="{{ i }}">☆</button>
+        {% endfor %}
+      </div>
+      <input type="hidden" id="selectedRating" value="0"/>
+    </div>
+    <div class="field-group">
+      <label class="field-label">Comment <span style="color:var(--t1);font-weight:400">(optional)</span></label>
+      <textarea id="reviewComment" class="field-inp" rows="3" placeholder="Share your experience…" style="resize:vertical"></textarea>
+    </div>
+    <div id="reviewErr" class="err-box" style="display:none"></div>
+    <div style="display:flex;gap:.75rem;margin-top:1rem">
+      <button type="button" id="reviewConfirm" class="btn btn-primary" style="flex:1">
+        <span class="btn-label">Submit Review</span>
+        <span class="btn-spin" style="display:none">⏳</span>
+      </button>
+      <button type="button" id="reviewClose" class="btn btn-ghost" style="flex:1">Cancel</button>
+    </div>
+  </div>
+</div>
+
+{# Refund/policy styles live in static/css/main.css #}
+
+<script>
+window.CSRF            = '{{ csrf_token() }}';
+window.RESCHEDULE_BASE = '/guest/booking/reschedule/';
+window.REVIEW_BASE     = '/guest/review/';
+window.PREVIEW_BASE    = '/guest/cancel/preview/';
+window.CANCEL_BASE     = '/guest/cancel/';
+
+/* ── Cancel modal logic ────────────────────────────────────── */
+(function () {
+  let _cancelUrl    = '';
+  let _cancelRid    = 0;
+
+  document.addEventListener('click', async function (e) {
+    const btn = e.target.closest('.cancel-btn');
+    if (!btn) return;
+
+    _cancelUrl = btn.dataset.url;
+    _cancelRid = btn.dataset.id;
+
+    // Reset modal state
+    document.getElementById('cancelLoading').style.display    = 'block';
+    document.getElementById('cancelRefundInfo').style.display = 'none';
+    document.getElementById('cancelErr').style.display        = 'none';
+    document.getElementById('cancelConfirmBtn').disabled      = true;
+    document.getElementById('cancelModal').classList.add('open');
+
+    // Fetch refund preview
+    try {
+      const res  = await fetch(window.PREVIEW_BASE + _cancelRid);
+      const data = await res.json();
+
+      document.getElementById('cancelLoading').style.display    = 'none';
+      document.getElementById('cancelRefundInfo').style.display = 'block';
+      document.getElementById('cancelConfirmBtn').disabled      = false;
+
+      if (data.success) {
+        const r = data.refund;
+
+        // Highlight box
+        const hl = document.getElementById('cancelRefundHighlight');
+        const icons = { full: '✅', partial: '⚠️', none: '❌' };
+        const hlClass = { full: 'rh-full', partial: 'rh-partial', none: 'rh-none' };
+        hl.className = `refund-highlight ${hlClass[r.tier]}`;
+        if (r.tier === 'none') {
+          hl.textContent = `❌ No Refund — cancellation is ${r.hours_until} h before check-in`;
+        } else {
+          hl.textContent =
+            `${icons[r.tier]} ${r.label}: ₱${r.refund_amount.toLocaleString('en-PH',{minimumFractionDigits:2})} ` +
+            `(${r.pct}%) — ${r.hours_until} h before check-in`;
+        }
+
+        // Policy table
+        const tbody = document.getElementById('policyTableBody');
+        tbody.innerHTML = '';
+        data.policy.forEach(p => {
+          const tr = document.createElement('tr');
+          if (p.tier === r.tier) tr.className = 'policy-active';
+          tr.innerHTML = `
+            <td>${p.window}</td>
+            <td>${p.label} (${p.pct}%)</td>
+            <td>₱${p.amount.toLocaleString('en-PH',{minimumFractionDigits:2})}</td>`;
+          tbody.appendChild(tr);
+        });
+      } else {
+        document.getElementById('cancelErr').textContent = data.message;
+        document.getElementById('cancelErr').style.display = 'block';
+      }
+    } catch {
+      document.getElementById('cancelLoading').style.display = 'none';
+      document.getElementById('cancelErr').textContent = 'Could not load refund info. You can still cancel.';
+      document.getElementById('cancelErr').style.display = 'block';
+      document.getElementById('cancelConfirmBtn').disabled = false;
+    }
+  });
+
+  document.getElementById('cancelCloseBtn').addEventListener('click', () => {
+    document.getElementById('cancelModal').classList.remove('open');
+  });
+  document.getElementById('cancelModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('cancelModal'))
+      document.getElementById('cancelModal').classList.remove('open');
+  });
+
+  document.getElementById('cancelConfirmBtn').addEventListener('click', async function () {
+    const lbl  = this.querySelector('.btn-label');
+    const spin = this.querySelector('.btn-spin');
+    this.disabled = true;
+    lbl.style.display  = 'none';
+    spin.style.display = 'inline';
+
+    try {
+      const res  = await fetch(_cancelUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF },
+        body: JSON.stringify({ csrf_token: window.CSRF }),
+      });
+      const data = await res.json();
+      document.getElementById('cancelModal').classList.remove('open');
+
+      if (data.success) {
+        // Update the card status in-place without a full reload
+        const row = document.getElementById('bk-' + _cancelRid);
+        if (row) {
+          row.classList.add('bk-cancelled');
+
+          // Swap badge
+          const badge = row.querySelector('.bk-badge');
+          if (badge) { badge.className = 'bk-badge bk-cancelled'; badge.textContent = 'Cancelled'; }
+
+          // Remove action buttons
+          const actions = row.querySelector('.bk-actions');
+          if (actions) actions.remove();
+          const reviewBtn = row.querySelector('.review-btn');
+          if (reviewBtn) reviewBtn.remove();
+
+          // Inject refund badge if we got refund info back
+          const r = data.refund;
+          if (r) {
+            const info = document.createElement('div');
+            info.className = 'bk-cancel-info';
+            const now = new Date().toISOString().slice(0,16).replace('T',' ');
+            const badgeCls = r.tier === 'full' ? 'refund-full' : r.tier === 'partial' ? 'refund-partial' : 'refund-none';
+            const badgeTxt = r.tier === 'full'
+              ? `✅ Full Refund — ₱${r.refund_amount.toLocaleString('en-PH',{minimumFractionDigits:2})}`
+              : r.tier === 'partial'
+              ? `⚠️ Partial Refund — ₱${r.refund_amount.toLocaleString('en-PH',{minimumFractionDigits:2})}`
+              : '❌ No Refund';
+            info.innerHTML = `<span class="bk-cancel-ts">🕓 Cancelled ${now} UTC</span>
+                              <span class="refund-badge ${badgeCls}">${badgeTxt}</span>`;
+            row.querySelector('.bk-info').appendChild(info);
+          }
+        }
+        showToast(data.message, 'success');
+      } else {
+        showToast(data.message || 'Cancellation failed.', 'error');
+        this.disabled = false;
+        lbl.style.display  = 'inline';
+        spin.style.display = 'none';
+      }
+    } catch {
+      showToast('Network error. Please try again.', 'error');
+      this.disabled = false;
+      lbl.style.display  = 'inline';
+      spin.style.display = 'none';
+    }
+  });
+}());
+</script>
+
+<script>
+/* ── Reschedule modal (unchanged from original) ─────────────── */
+let _rescheduleId = 0, _rescheduleBasePrice = 0, _rescheduleCid = 0;
+
+document.querySelectorAll('.reschedule-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    _rescheduleId        = btn.dataset.id;
+    _rescheduleBasePrice = parseFloat(btn.dataset.price);
+    _rescheduleCid       = btn.dataset.cid;
+    document.getElementById('rescheduleTitle').textContent =
+      btn.dataset.cottage + ' · ' + btn.dataset.date;
+    document.getElementById('newDate').value  = btn.dataset.date;
+    document.getElementById('newShift').value = btn.dataset.shift;
+    document.getElementById('rescheduleErr').style.display = 'none';
+    document.getElementById('rescheduleModal').classList.add('open');
+  });
+});
+
+document.getElementById('rescheduleClose').addEventListener('click', () =>
+  document.getElementById('rescheduleModal').classList.remove('open'));
+
+document.getElementById('rescheduleConfirm').addEventListener('click', async function () {
+  const lbl  = this.querySelector('.btn-label');
+  const spin = this.querySelector('.btn-spin');
+  const err  = document.getElementById('rescheduleErr');
+  err.style.display = 'none';
+  this.disabled = true; lbl.style.display = 'none'; spin.style.display = 'inline';
+  const newDate  = document.getElementById('newDate').value;
+  const newShift = document.getElementById('newShift').value;
+  const res = await fetch(window.RESCHEDULE_BASE + _rescheduleId, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF },
+    body: JSON.stringify({ date: newDate, shift: newShift, csrf_token: window.CSRF }),
+  });
+  const data = await res.json();
+  this.disabled = false; lbl.style.display = 'inline'; spin.style.display = 'none';
+  if (data.success) {
+    document.getElementById('rescheduleModal').classList.remove('open');
+    showToast(data.message, 'success');
+    setTimeout(() => location.reload(), 1000);
+  } else {
+    err.textContent = data.message; err.style.display = 'block';
+  }
+});
+
+/* ── Review modal (unchanged from original) ──────────────────── */
+let _reviewId = 0;
+document.querySelectorAll('.review-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    _reviewId = btn.dataset.id;
+    document.getElementById('reviewTitle').textContent = 'Reviewing: ' + btn.dataset.cottage;
+    document.getElementById('selectedRating').value = '0';
+    document.querySelectorAll('.star-btn').forEach(s => s.textContent = '☆');
+    document.getElementById('reviewComment').value = '';
+    document.getElementById('reviewErr').style.display = 'none';
+    document.getElementById('reviewModal').classList.add('open');
+  });
+});
+
+document.querySelectorAll('.star-btn').forEach((btn, idx, all) => {
+  btn.addEventListener('click', () => {
+    document.getElementById('selectedRating').value = btn.dataset.val;
+    all.forEach((s, i) => s.textContent = i <= idx ? '★' : '☆');
+  });
+});
+
+document.getElementById('reviewClose').addEventListener('click', () =>
+  document.getElementById('reviewModal').classList.remove('open'));
+
+document.getElementById('reviewConfirm').addEventListener('click', async function () {
+  const lbl  = this.querySelector('.btn-label');
+  const spin = this.querySelector('.btn-spin');
+  const err  = document.getElementById('reviewErr');
+  err.style.display = 'none';
+  const rating  = parseInt(document.getElementById('selectedRating').value);
+  const comment = document.getElementById('reviewComment').value;
+  if (!rating) { err.textContent = 'Please select a star rating.'; err.style.display = 'block'; return; }
+  this.disabled = true; lbl.style.display = 'none'; spin.style.display = 'inline';
+  const res = await fetch(window.REVIEW_BASE + _reviewId, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF },
+    body: JSON.stringify({ rating, comment, csrf_token: window.CSRF }),
+  });
+  const data = await res.json();
+  this.disabled = false; lbl.style.display = 'inline'; spin.style.display = 'none';
+  if (data.success) {
+    document.getElementById('reviewModal').classList.remove('open');
+    showToast(data.message, 'success');
+    setTimeout(() => location.reload(), 1000);
+  } else {
+    err.textContent = data.message; err.style.display = 'block';
+  }
+});
+</script>
+{% endblock %}

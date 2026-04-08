@@ -1,0 +1,210 @@
+{% extends 'base.html' %}
+{% block title %}Book {{ cottage.name }} — Paradise Resort{% endblock %}
+{% block body %}
+<div class="booking-page">
+  <div class="booking-bg" style="background-image:url('{{ url_for('static',filename='images/'+cottage.image_path) }}')"></div>
+  <div class="booking-overlay"></div>
+  <a href="{{ url_for('guest.dashboard') }}" class="back-btn" aria-label="Back to dashboard">← Dashboard</a>
+
+  <div class="booking-wrap">
+    <!-- Left info panel -->
+    <div class="b-info">
+      <img class="b-info-img" src="{{ url_for('static', filename='images/' + cottage.image_path) }}" alt="{{ cottage.name }}" onerror="this.src='{{ url_for('static', filename='images/welcome.jpg') }}'"/>
+      <h2 class="b-info-name">{{ cottage.name }}</h2>
+      <p class="b-info-inc">{{ cottage.inclusions }}</p>
+      <div class="b-info-row"><span>Base price</span><strong>₱{{ '{:,.0f}'.format(cottage.price) }}</strong></div>
+      <div class="b-info-row"><span>Night add-on</span><strong>+₱500</strong></div>
+      <div class="b-info-row b-info-capacity"><span>👥 Max guests</span><strong>{{ cottage.max_guests or 2 }} person{{ 's' if (cottage.max_guests or 2) > 1 }}</strong></div>
+
+      <!-- Room Policy -->
+      {% if cottage.policy %}
+      <div class="b-policy-box">
+        <div class="b-policy-title">📋 Room Policy</div>
+        <p class="b-policy-text">{{ cottage.policy }}</p>
+      </div>
+      {% endif %}
+
+      <!-- Refund / Cancellation Policy -->
+      <div class="b-policy-box b-policy-refund">
+        <div class="b-policy-title">💸 Cancellation &amp; Refund</div>
+        <p class="b-policy-text">
+          You may cancel your booking at any time. Upon cancellation, your payment will be
+          <strong>fully refunded</strong> within 3–5 business days via your original payment method.
+        </p>
+      </div>
+
+      {% if reviews %}
+      <div class="b-reviews">
+        <h4>Guest Reviews
+          <span class="rev-avg">
+            {% set avg = (reviews|sum(attribute='rating') / reviews|length)|round(1) %}
+            {{ avg }}⭐ ({{ reviews|length }})
+          </span>
+        </h4>
+        {% for r in reviews[:3] %}
+        <div class="rev-item">
+          <div class="rev-stars">{% for i in range(r.rating) %}⭐{% endfor %}</div>
+          <p class="rev-comment">{{ r.comment or 'No comment.' }}</p>
+          <small>— {{ r.guest_username }}</small>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Right booking form -->
+    <div class="b-form-wrap">
+      <div class="b-mobile-head">
+        <img src="{{ url_for('static', filename='images/' + cottage.image_path) }}" alt="{{ cottage.name }}" onerror="this.src='{{ url_for('static', filename='images/welcome.jpg') }}'"/>
+        <div><strong>{{ cottage.name }}</strong><small>{{ cottage.inclusions }}</small></div>
+      </div>
+      <h3 class="b-form-title">Reservation Details</h3>
+
+      <!-- Availability Calendar -->
+      <div class="field-group">
+        <label class="field-label">📅 Availability Calendar</label>
+        <div class="cal-wrap">
+          <div class="cal-nav">
+            <button type="button" id="calPrev" aria-label="Previous month">‹</button>
+            <span id="calTitle" aria-live="polite"></span>
+            <button type="button" id="calNext" aria-label="Next month">›</button>
+          </div>
+          <div class="cal-grid" id="calGrid" role="grid" aria-label="Availability calendar"></div>
+          <div class="cal-legend" aria-label="Calendar legend">
+            <span><span class="cal-dot cal-dot-free"></span>Available</span>
+            <span><span class="cal-dot cal-dot-day"></span>Day booked</span>
+            <span><span class="cal-dot cal-dot-night"></span>Night booked</span>
+            <span><span class="cal-dot cal-dot-full"></span>Fully booked</span>
+          </div>
+        </div>
+      </div>
+
+      <form id="bookingForm" novalidate>
+        <input type="hidden" id="cottageId" value="{{ cottage.id }}"/>
+        <input type="hidden" id="csrfToken" value="{{ csrf_token() }}"/>
+        <input type="hidden" id="maxGuests" value="{{ cottage.max_guests or 2 }}"/>
+
+        <div class="field-group">
+          <label class="field-label" for="bookDate">📅 Date of Visit</label>
+          <input type="date" id="bookDate" class="field-inp" min="{{ today }}" value="{{ today }}" required/>
+        </div>
+
+        <!-- Number of guests -->
+        <div class="field-group">
+          <label class="field-label" for="numGuests">
+            👥 Number of Guests
+            <span class="capacity-hint">Max: {{ cottage.max_guests or 2 }}</span>
+          </label>
+          <div class="guest-counter">
+            <button type="button" class="guest-dec" id="guestDec" aria-label="Decrease guests">−</button>
+            <input type="number" id="numGuests" class="field-inp guest-count-input"
+                   value="1" min="1" max="{{ cottage.max_guests or 2 }}"
+                   aria-label="Number of guests" readonly/>
+            <button type="button" class="guest-inc" id="guestInc" aria-label="Increase guests">+</button>
+          </div>
+        </div>
+
+        <!-- Shift -->
+        <div class="field-group">
+          <label class="field-label">🕐 Shift</label>
+          <div class="pick-grid" id="shiftGrid">
+            <div class="pick-card active" data-val="Day Tour (8am-5pm)" role="radio" aria-checked="true" tabindex="0">
+              <span class="pick-icon" aria-hidden="true">☀️</span>
+              <span class="pick-label">Day Tour</span>
+              <span class="pick-sub">8am – 5pm</span>
+              <span class="pick-add">+₱0</span>
+            </div>
+            <div class="pick-card" data-val="Night Tour (6pm-12mn)" role="radio" aria-checked="false" tabindex="0">
+              <span class="pick-icon" aria-hidden="true">🌙</span>
+              <span class="pick-label">Night Tour</span>
+              <span class="pick-sub">6pm – 12mn</span>
+              <span class="pick-add">+₱500</span>
+            </div>
+          </div>
+          <input type="hidden" id="selectedShift" value="Day Tour (8am-5pm)"/>
+        </div>
+
+        <!-- Payment -->
+        <div class="field-group">
+          <label class="field-label">💳 Payment Method</label>
+          <div class="pick-grid" id="payGrid">
+            <div class="pick-card active" data-val="cash" role="radio" aria-checked="true" tabindex="0">
+              <span class="pick-icon" aria-hidden="true">💵</span>
+              <span class="pick-label">Cash</span>
+              <span class="pick-sub">Walk-in payment</span>
+            </div>
+            <div class="pick-card" data-val="bank" role="radio" aria-checked="false" tabindex="0">
+              <span class="pick-icon" aria-hidden="true">📱</span>
+              <span class="pick-label">GCash / Bank</span>
+              <span class="pick-sub">Ref no. required</span>
+            </div>
+          </div>
+          <input type="hidden" id="selectedPay" value="cash"/>
+        </div>
+
+        <div class="field-group" id="refGroup" style="display:none">
+          <label class="field-label" for="refInput">🔖 Reference Number</label>
+          <input type="text" id="refInput" class="field-inp" placeholder="Enter GCash / Bank reference number"/>
+        </div>
+
+        <div class="b-total">
+          <span>Total Amount</span>
+          <div class="b-total-price" id="totalPrice">₱{{ '{:,.0f}'.format(cottage.price) }}</div>
+        </div>
+
+        <div id="bookErr" class="err-box" style="display:none"></div>
+
+        <button type="submit" id="confirmBtn" class="btn btn-primary btn-full btn-lg">
+          <span class="btn-label">✅ Confirm Booking</span>
+          <span class="btn-spin" style="display:none">⏳ Processing…</span>
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Receipt modal -->
+<div class="modal-bg" id="modalBg" role="dialog" aria-modal="true" aria-labelledby="receiptTitle">
+  <div class="modal-box">
+    <div class="receipt-head">
+      <div class="receipt-logo" aria-hidden="true">🌴</div>
+      <h2 id="receiptTitle">Booking Confirmed!</h2>
+      <p>Your paradise awaits ✨</p>
+    </div>
+    <div class="receipt-rows" id="receiptRows"></div>
+    <!-- Email notice — shown/hidden by JS -->
+    <div id="receiptEmailNotice" class="receipt-email-notice" style="display:none"></div>
+    <div class="receipt-btns">
+      <a href="{{ url_for('guest.my_bookings') }}" class="btn btn-ghost btn-sm">📋 My Bookings</a>
+      <a href="{{ url_for('guest.dashboard') }}" class="btn btn-primary btn-sm">🏠 Dashboard</a>
+    </div>
+  </div>
+</div>
+
+<script>
+window.BASE_PRICE  = {{ cottage.price }};
+window.MAX_GUESTS  = {{ cottage.max_guests or 2 }};
+window.CONFIRM_URL = '{{ url_for("guest.confirm_booking") }}';
+window.BOOKED_URL  = '{{ url_for("guest.booked_dates", cid=cottage.id) }}';
+window.CSRF        = document.getElementById('csrfToken').value;
+
+/* Guest counter */
+(function(){
+  const dec = document.getElementById('guestDec');
+  const inc = document.getElementById('guestInc');
+  const inp = document.getElementById('numGuests');
+  if (!dec || !inc || !inp) return;
+  const max = window.MAX_GUESTS || 2;
+  function update() {
+    const v = parseInt(inp.value) || 1;
+    dec.disabled = v <= 1;
+    inc.disabled = v >= max;
+    dec.classList.toggle('disabled', v <= 1);
+    inc.classList.toggle('disabled', v >= max);
+  }
+  dec.addEventListener('click', () => { let v = parseInt(inp.value)||1; if(v>1){inp.value=v-1; update();} });
+  inc.addEventListener('click', () => { let v = parseInt(inp.value)||1; if(v<max){inp.value=v+1; update();} });
+  update();
+})();
+</script>
+{% endblock %}

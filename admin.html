@@ -1,0 +1,418 @@
+{% extends 'base.html' %}
+{% block title %}Admin — Paradise Resort{% endblock %}
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+{% block body %}
+<div class="app">
+  <div class="sb-backdrop" id="sbBackdrop"></div>
+  <aside class="sidebar sidebar-admin" id="sidebar">
+    <div class="sb-top"><div class="sb-brand">🛡️ Admin</div><button class="sb-close" id="sbClose" type="button">✕</button></div>
+    <nav class="sb-nav">
+      <a href="#" class="sb-link active" data-tab="overview" id="nav-overview"><span>📊</span> Overview</a>
+      <a href="#" class="sb-link" data-tab="inventory" id="nav-inventory"><span>🏠</span> Inventory</a>
+      <a href="#" class="sb-link" data-tab="guests" id="nav-guests"><span>👥</span> Guests</a>
+      <a href="#" class="sb-link" data-tab="reports" id="nav-reports"><span>📈</span> Reports</a>
+      <a href="#" class="sb-link" data-tab="reviews" id="nav-reviews"><span>⭐</span> Reviews</a>
+    </nav>
+    <div class="sb-footer">
+      <button class="theme-toggle" id="themeToggle" type="button">🌙 Dark Mode</button>
+      <div class="sb-user">
+        <div class="sb-avatar sb-avatar-gold">A</div>
+        <div class="sb-user-info"><strong>{{ admin }}</strong><small>Administrator</small></div>
+      </div>
+      <a href="{{ url_for('auth.logout') }}" class="btn btn-danger btn-sm btn-full">🚪 Logout</a>
+    </div>
+  </aside>
+
+  <div class="app-main">
+    <header class="app-header">
+      <button class="hamburger" id="menuBtn" type="button"><span></span><span></span><span></span></button>
+      <div class="app-header-info" style="flex:1">
+        <h1>Admin <em>Control Center</em></h1>
+        <p>Manage your resort operations</p>
+      </div>
+      <!-- Notification bell -->
+      <div class="notif-wrap">
+        <button type="button" class="notif-btn" id="notifBtn" title="Notifications">
+          🔔
+          <span class="notif-badge" id="notifBadge" {% if unread == 0 %}style="display:none"{% endif %}>{{ unread }}</span>
+        </button>
+        <div class="notif-panel" id="notifPanel" style="display:none">
+          <div class="notif-head">
+            <strong>Notifications</strong>
+            <button type="button" id="markReadBtn" class="btn btn-ghost btn-sm">Mark all read</button>
+          </div>
+          <div class="notif-list" id="notifList">
+            {% for n in notifs %}
+            <div class="notif-item {% if not n.is_read %}notif-unread{% endif %}">
+              <span class="notif-icon">{% if n.type == 'booking' %}📋{% else %}❌{% endif %}</span>
+              <div>
+                <p>{{ n.message }}</p>
+                <small>{{ n.created_at[:16] }}</small>
+              </div>
+            </div>
+            {% else %}
+            <p style="padding:1rem;text-align:center;color:var(--t1)">No notifications yet.</p>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- OVERVIEW TAB -->
+    <section class="tab-section active" id="tab-overview">
+      <div class="stats-row">
+        <div class="stat-card green"><div class="stat-ico">📋</div><div class="stat-num counter" data-to="{{ stats.total }}">0</div><div class="stat-lbl">Total Bookings</div></div>
+        <div class="stat-card gold"><div class="stat-ico">💰</div><div class="stat-num">₱<span class="counter" data-to="{{ stats.revenue|int }}">0</span></div><div class="stat-lbl">Total Revenue</div></div>
+        <div class="stat-card blue"><div class="stat-ico">🌅</div><div class="stat-num counter" data-to="{{ stats.today }}">0</div><div class="stat-lbl">Today's Bookings</div></div>
+        <div class="stat-card teal"><div class="stat-ico">🏠</div><div class="stat-num counter" data-to="{{ cottages|length }}">0</div><div class="stat-lbl">Accommodations</div></div>
+      </div>
+
+      <!-- Revenue Chart -->
+      <div class="a-card">
+        <div class="a-card-head">
+          <h3>📊 Monthly Revenue</h3>
+          <a href="{{ url_for('admin.export_csv') }}" class="btn btn-outline btn-sm" download>⬇️ Export CSV</a>
+        </div>
+        <div class="a-card-body" style="padding:1.25rem">
+          <canvas id="revenueChart" height="100"></canvas>
+        </div>
+      </div>
+
+      <!-- Walk-in Booking -->
+      <div class="a-card">
+        <div class="a-card-head">
+          <h3>🚶 Walk-in Booking</h3>
+          <button type="button" class="btn btn-primary btn-sm" id="walkinToggle">+ New Walk-in</button>
+        </div>
+        <div id="walkinForm" class="a-card-body" style="display:none">
+          <form id="walkinBookingForm" novalidate>
+            <input type="hidden" id="walkinCsrf" value="{{ csrf_token() }}"/>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+              <div class="field-group">
+                <label class="field-label">Guest Name <span class="req">*</span></label>
+                <input type="text" name="guest_name" class="field-inp" placeholder="Walk-in guest name" required/>
+              </div>
+              <div class="field-group">
+                <label class="field-label">Cottage <span class="req">*</span></label>
+                <select name="cottage_id" class="field-inp" required>
+                  <option value="">Select cottage…</option>
+                  {% for c in cottages %}
+                  <option value="{{ c.id }}">{{ c.name }} — ₱{{ '{:,.0f}'.format(c.price) }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="field-group">
+                <label class="field-label">Date <span class="req">*</span></label>
+                <input type="date" name="date" class="field-inp" required/>
+              </div>
+              <div class="field-group">
+                <label class="field-label">Shift <span class="req">*</span></label>
+                <select name="shift" class="field-inp" required>
+                  <option value="Day Tour (8am-5pm)">Day Tour (8am–5pm)</option>
+                  <option value="Night Tour (6pm-12mn)">Night Tour (6pm–12mn) +₱500</option>
+                </select>
+              </div>
+              <div class="field-group">
+                <label class="field-label">Payment <span class="req">*</span></label>
+                <select name="payment" class="field-inp" required>
+                  <option value="cash">Cash</option>
+                  <option value="bank">GCash / Bank</option>
+                </select>
+              </div>
+              <div class="field-group">
+                <label class="field-label">Reference No.</label>
+                <input type="text" name="reference" class="field-inp" placeholder="If GCash/Bank"/>
+              </div>
+            </div>
+            <div id="walkinErr" class="err-box" style="display:none"></div>
+            <button type="submit" id="walkinSubmit" class="btn btn-primary">
+              <span class="btn-label">✅ Create Walk-in Booking</span>
+              <span class="btn-spin" style="display:none">⏳</span>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Recent Transactions -->
+      <div class="a-card">
+        <div class="a-card-head">
+          <h3>Recent Transactions</h3>
+          <button type="button" class="btn btn-outline btn-sm tab-nav" data-tab="reports">View All →</button>
+        </div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>#</th><th>Cottage</th><th>Guest</th><th>Date</th><th>Total</th><th>Status</th><th>Refund</th><th>Action</th></tr></thead>
+            <tbody>
+              {% for r in reservations[:10] %}
+              <tr id="res-{{ r.id }}">
+                <td>{{ r.id }}{% if r.is_walkin %}<span class="badge-walkin">Walk-in</span>{% endif %}</td>
+                <td>{{ r.cottage_name }}</td>
+                <td>{{ r.guest_username }}</td>
+                <td>{{ r.date }}</td>
+                <td>₱{{ '{:,.0f}'.format(r.total_price) }}</td>
+                <td><span class="badge {{ r.status }}">{{ r.status|title }}</span></td>
+                <td>
+                  {% if r.status == 'cancelled' and r.refund_status %}
+                    {% if r.refund_status == 'full' %}
+                      <span class="refund-badge refund-full">✅ ₱{{ '{:,.0f}'.format(r.refund_amount) }}</span>
+                    {% elif r.refund_status == 'partial' %}
+                      <span class="refund-badge refund-partial">⚠️ ₱{{ '{:,.0f}'.format(r.refund_amount) }}</span>
+                    {% else %}
+                      <span class="refund-badge refund-none">❌ None</span>
+                    {% endif %}
+                  {% else %}
+                    <span style="color:var(--t1);font-size:.8rem">—</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if r.status == 'confirmed' %}
+                  <button type="button" class="btn btn-danger btn-sm cancel-res-btn"
+                          data-id="{{ r.id }}"
+                          data-url="{{ url_for('admin.cancel_reservation', rid=r.id) }}">Cancel</button>
+                  {% endif %}
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="8" style="text-align:center;color:var(--t1);padding:2rem">No bookings yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- INVENTORY TAB -->
+    <section class="tab-section" id="tab-inventory">
+      <div class="two-col">
+        <div class="a-card">
+          <div class="a-card-head"><h3>➕ Add Accommodation</h3></div>
+          <div class="a-card-body">
+            <form id="addCottageForm" enctype="multipart/form-data" novalidate>
+              <input type="hidden" id="addCsrf" value="{{ csrf_token() }}"/>
+              <div class="field-group"><label class="field-label">Name <span class="req">*</span></label><input type="text" name="name" class="field-inp" required placeholder="e.g. Bahay Kubo C"/></div>
+              <div class="field-group"><label class="field-label">Price (₱) <span class="req">*</span></label><input type="number" name="price" class="field-inp" min="1" step="any" required placeholder="e.g. 2500"/></div>
+              <div class="field-group"><label class="field-label">Inclusions <span class="req">*</span></label><input type="text" name="inclusions" class="field-inp" required placeholder="e.g. WiFi, Aircon"/></div>
+              <div class="field-group">
+                <label class="field-label">Photo</label>
+                <div class="file-zone" id="fileZone"><span id="fileZoneLabel">📂 Click to select or drag image here</span><input type="file" name="image" id="imgInput" accept="image/*"/></div>
+                <div id="imgPreview" class="img-prev"></div>
+              </div>
+              <div id="addErr" class="err-box" style="display:none"></div>
+              <button type="submit" id="addBtn" class="btn btn-primary btn-full">💾 Save Accommodation</button>
+            </form>
+          </div>
+        </div>
+
+        <div class="a-card">
+          <div class="a-card-head"><h3>Current Inventory</h3><span class="a-count">{{ cottages|length }} items</span></div>
+          <div class="inv-list" id="invList">
+            {% for c in cottages %}
+            <div class="inv-row" id="inv-{{ c.id }}">
+              <img src="{{ url_for('static', filename='images/' + c.image_path) }}" alt="{{ c.name }}" onerror="this.src='{{ url_for('static', filename='images/welcome.jpg') }}'"/>
+              <div class="inv-info">
+                <strong>{{ c.name }}</strong>
+                <span>₱{{ '{:,.0f}'.format(c.price) }} · {% if c.avg_rating %}{{ '%.1f'|format(c.avg_rating) }}⭐{% else %}No reviews{% endif %}</span>
+              </div>
+              <div style="display:flex;gap:.4rem">
+                <button type="button" class="btn btn-outline btn-sm edit-cottage"
+                        data-id="{{ c.id }}" data-name="{{ c.name }}"
+                        data-price="{{ c.price }}" data-inc="{{ c.inclusions }}"
+                        data-url="{{ url_for('admin.edit_cottage', cid=c.id) }}">✏️ Edit</button>
+                <button type="button" class="btn btn-danger btn-sm del-cottage"
+                        data-id="{{ c.id }}" data-name="{{ c.name }}"
+                        data-url="{{ url_for('admin.delete_cottage', cid=c.id) }}">🗑</button>
+              </div>
+            </div>
+            {% else %}
+            <p style="padding:1.5rem;text-align:center;color:var(--t1)">No accommodations yet.</p>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- GUESTS TAB -->
+    <section class="tab-section" id="tab-guests">
+      <div class="a-card">
+        <div class="a-card-head"><h3>👥 Registered Guests</h3><span class="a-count">{{ users|length }} total</span></div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>ID</th><th>Username</th><th>Email</th><th>Joined</th><th>Action</th></tr></thead>
+            <tbody id="guestsTbody">
+              {% for u in users %}
+              <tr id="gr-{{ u.username }}">
+                <td>{{ u.id }}</td>
+                <td><div class="user-cell"><div class="mini-av">{{ u.username[0].upper() }}</div><span>{{ u.username }}</span></div></td>
+                <td>{{ u.email or '—' }}</td>
+                <td>{{ u.created_at[:10] if u.created_at else '—' }}</td>
+                <td>
+                  <button type="button" class="btn btn-danger btn-sm del-user"
+                          data-username="{{ u.username }}"
+                          data-url="{{ url_for('admin.delete_user', username=u.username) }}">Remove</button>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="5" style="text-align:center;color:var(--t1);padding:2rem">No guests registered yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- REPORTS TAB -->
+    <section class="tab-section" id="tab-reports">
+      <div class="a-card">
+        <div class="a-card-head">
+          <h3>📈 Transaction History</h3>
+          <div style="display:flex;gap:.5rem;align-items:center">
+            <span class="a-count">{{ reservations|length }} records</span>
+            <a href="{{ url_for('admin.export_csv') }}" class="btn btn-outline btn-sm" download>⬇️ Export CSV</a>
+          </div>
+        </div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>#</th><th>Cottage</th><th>Guest</th><th>Date</th><th>Shift</th><th>Payment</th><th>Total</th><th>Status</th><th>Cancelled At</th><th>Refund</th><th>Action</th></tr></thead>
+            <tbody>
+              {% for r in reservations %}
+              <tr id="res-all-{{ r.id }}">
+                <td>{{ r.id }}{% if r.is_walkin %}<span class="badge-walkin">Walk-in</span>{% endif %}</td>
+                <td>{{ r.cottage_name }}</td>
+                <td>{{ r.guest_username }}</td>
+                <td>{{ r.date }}</td>
+                <td>{{ 'Day' if 'Day' in r.shift else 'Night' }}</td>
+                <td>{{ r.payment_method|title }}</td>
+                <td>₱{{ '{:,.0f}'.format(r.total_price) }}</td>
+                <td><span class="badge {{ r.status }}">{{ r.status|title }}</span></td>
+                <td style="font-size:.78rem;color:var(--t1)">
+                  {{ r.cancelled_at[:16] if r.cancelled_at else '—' }}
+                </td>
+                <td>
+                  {% if r.status == 'cancelled' and r.refund_status %}
+                    {% if r.refund_status == 'full' %}
+                      <span class="refund-badge refund-full">✅ Full<br><small>₱{{ '{:,.0f}'.format(r.refund_amount) }}</small></span>
+                    {% elif r.refund_status == 'partial' %}
+                      <span class="refund-badge refund-partial">⚠️ 50%<br><small>₱{{ '{:,.0f}'.format(r.refund_amount) }}</small></span>
+                    {% else %}
+                      <span class="refund-badge refund-none">❌ None</span>
+                    {% endif %}
+                  {% else %}
+                    <span style="color:var(--t1);font-size:.8rem">—</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if r.status == 'confirmed' %}
+                  <button type="button" class="btn btn-danger btn-sm cancel-res-btn"
+                          data-id="{{ r.id }}"
+                          data-url="{{ url_for('admin.cancel_reservation', rid=r.id) }}">Cancel</button>
+                  {% endif %}
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="11" style="text-align:center;color:var(--t1);padding:2rem">No transactions yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- REVIEWS TAB -->
+    <section class="tab-section" id="tab-reviews">
+      <div class="a-card">
+        <div class="a-card-head"><h3>⭐ Guest Reviews</h3><span class="a-count">{{ reviews|length }} total</span></div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>Cottage</th><th>Guest</th><th>Rating</th><th>Comment</th><th>Date</th></tr></thead>
+            <tbody>
+              {% for r in reviews %}
+              <tr>
+                <td>{{ r.cottage_name }}</td>
+                <td>{{ r.guest_username }}</td>
+                <td>{% for i in range(r.rating) %}⭐{% endfor %}</td>
+                <td>{{ r.comment or '—' }}</td>
+                <td>{{ r.created_at[:10] }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="5" style="text-align:center;color:var(--t1);padding:2rem">No reviews yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- Edit Cottage Modal -->
+<div class="modal-bg" id="editModal">
+  <div class="modal-box">
+    <h3 style="margin-bottom:1.25rem">✏️ Edit Accommodation</h3>
+    <form id="editCottageForm" enctype="multipart/form-data" novalidate>
+      <input type="hidden" id="editCsrf" value="{{ csrf_token() }}"/>
+      <div class="field-group"><label class="field-label">Name</label><input type="text" name="name" id="editName" class="field-inp" required/></div>
+      <div class="field-group"><label class="field-label">Price (₱)</label><input type="number" name="price" id="editPrice" class="field-inp" min="1" required/></div>
+      <div class="field-group"><label class="field-label">Inclusions</label><input type="text" name="inclusions" id="editInc" class="field-inp" required/></div>
+      <div class="field-group">
+        <label class="field-label">New Photo <span style="color:var(--t1);font-weight:400">(leave blank to keep current)</span></label>
+        <div class="file-zone"><span>📂 Click to select new image</span><input type="file" name="image" accept="image/*"/></div>
+      </div>
+      <div id="editErr" class="err-box" style="display:none"></div>
+      <div style="display:flex;gap:.75rem;margin-top:1rem">
+        <button type="submit" class="btn btn-primary" style="flex:1">
+          <span class="btn-label">💾 Save Changes</span>
+          <span class="btn-spin" style="display:none">⏳</span>
+        </button>
+        <button type="button" id="editClose" class="btn btn-ghost" style="flex:1">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+window.CSRF             = '{{ csrf_token() }}';
+window.ADD_COTTAGE_URL  = '{{ url_for("admin.add_cottage") }}';
+window.WALKIN_URL       = '{{ url_for("admin.walkin_booking") }}';
+window.NOTIF_URL        = '{{ url_for("admin.notifications") }}';
+window.NOTIF_READ_URL   = '{{ url_for("admin.mark_read") }}';
+
+// Revenue chart
+const monthlyData = {{ monthly | tojson }};
+document.addEventListener('DOMContentLoaded', () => {
+  const ctx = document.getElementById('revenueChart');
+  if (!ctx || !monthlyData.length) return;
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: monthlyData.map(d => d.month),
+      datasets: [{
+        label: 'Revenue (₱)',
+        data: monthlyData.map(d => d.revenue),
+        backgroundColor: 'rgba(34,168,84,.7)',
+        borderColor: '#22a854',
+        borderWidth: 2,
+        borderRadius: 6,
+      },{
+        label: 'Bookings',
+        data: monthlyData.map(d => d.bookings),
+        backgroundColor: 'rgba(201,146,42,.7)',
+        borderColor: '#c9922a',
+        borderWidth: 2,
+        borderRadius: 6,
+        yAxisID: 'y2',
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: 'top' }, tooltip: { mode: 'index' } },
+      scales: {
+        y:  { beginAtZero: true, title: { display: true, text: 'Revenue (₱)' } },
+        y2: { beginAtZero: true, position: 'right', title: { display: true, text: 'Bookings' }, grid: { drawOnChartArea: false } }
+      }
+    }
+  });
+});
+</script>
+{% endblock %}

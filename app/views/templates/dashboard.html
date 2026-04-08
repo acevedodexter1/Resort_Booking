@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard — Paradise Resort{% endblock %}
+{% block body %}
+<div class="app">
+  <div class="sb-backdrop" id="sbBackdrop"></div>
+  <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+    <div class="sb-top">
+      <div class="sb-brand">🌴 Paradise</div>
+      <button class="sb-close" id="sbClose" type="button" aria-label="Close menu">✕</button>
+    </div>
+    <nav class="sb-nav">
+      <a href="{{ url_for('guest.dashboard') }}" class="sb-link active" aria-current="page"><span aria-hidden="true">🏖️</span> Accommodations</a>
+      <a href="{{ url_for('guest.my_bookings') }}" class="sb-link"><span aria-hidden="true">📋</span> My Bookings</a>
+      <a href="{{ url_for('auth.profile') }}" class="sb-link"><span aria-hidden="true">👤</span> My Profile</a>
+    </nav>
+    <div class="sb-footer">
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode">🌙 Dark Mode</button>
+      <div class="sb-user">
+        <div class="sb-avatar" aria-hidden="true">{{ user[0].upper() }}</div>
+        <div class="sb-user-info"><strong>{{ user }}</strong><small>Guest Account</small></div>
+      </div>
+      <a href="{{ url_for('auth.logout') }}" class="btn btn-danger btn-sm btn-full" aria-label="Logout">🚪 Logout</a>
+    </div>
+  </aside>
+
+  <div class="app-main" id="main-content">
+    <header class="app-header">
+      <button class="hamburger" id="menuBtn" type="button" aria-label="Open menu" aria-expanded="false"><span></span><span></span><span></span></button>
+      <div class="app-header-info">
+        <h1>Good day, <em>{{ user }}</em> 🌺</h1>
+        <p>{{ cottages|length }} accommodation{{ 's' if cottages|length != 1 }} available</p>
+      </div>
+    </header>
+
+    <!-- Availability Checker -->
+    <div class="avail-bar" role="search" aria-label="Check accommodation availability">
+      <div class="avail-bar-title">🔍 Check Availability</div>
+      <div class="avail-bar-fields">
+        <select id="availCottage" class="field-inp" style="flex:2" aria-label="Select cottage">
+          <option value="">Select cottage…</option>
+          {% for c in cottages %}
+          <option value="{{ c.id }}">{{ c.name }}</option>
+          {% endfor %}
+        </select>
+        <input type="date" id="availDate" class="field-inp" style="flex:1.5" min="{{ today }}" aria-label="Select date"/>
+        <select id="availShift" class="field-inp" style="flex:2" aria-label="Select shift">
+          <option value="Day Tour (8am-5pm)">Day Tour</option>
+          <option value="Night Tour (6pm-12mn)">Night Tour</option>
+        </select>
+        <button type="button" id="availBtn" class="btn btn-primary">Check</button>
+      </div>
+      <div id="availResult" class="avail-result" style="display:none" role="status" aria-live="polite"></div>
+    </div>
+
+    <!-- Filter & Sort Bar -->
+    <div class="filter-bar">
+      <div class="search-box">
+        <span aria-hidden="true">🔍</span>
+        <input type="search" id="searchInput" placeholder="Search accommodations…" autocomplete="off" aria-label="Search accommodations"/>
+      </div>
+      <div class="filter-chips" role="group" aria-label="Filter by price range">
+        <button type="button" class="fchip active" data-f="all" aria-pressed="true">All</button>
+        <button type="button" class="fchip" data-f="budget" aria-pressed="false">Budget</button>
+        <button type="button" class="fchip" data-f="mid" aria-pressed="false">Mid-range</button>
+        <button type="button" class="fchip" data-f="luxury" aria-pressed="false">Luxury</button>
+      </div>
+      <select id="sortSelect" class="field-inp sort-select" aria-label="Sort accommodations">
+        <option value="">Sort…</option>
+        <option value="price-asc">Price: Low → High</option>
+        <option value="price-desc">Price: High → Low</option>
+        <option value="name-asc">Name A–Z</option>
+      </select>
+    </div>
+
+    <!-- Refund info banner -->
+    <div class="refund-banner" role="note" aria-label="Cancellation and refund info">
+      <span aria-hidden="true">💸</span>
+      <span>Cancellations are <strong>fully refunded</strong> — you can cancel anytime and get your money back within 3–5 business days.</span>
+    </div>
+
+    <div class="cottages-grid" id="cottageGrid" role="list" aria-label="Available accommodations">
+      {% for c in cottages %}
+      <article class="c-card" data-price="{{ c.price }}" data-name="{{ c.name.lower() }}" role="listitem">
+        <div class="c-card-img">
+          <img src="{{ url_for('static', filename='images/' + c.image_path) }}" alt="{{ c.name }}" loading="lazy"
+               onerror="this.src='{{ url_for('static', filename='images/welcome.jpg') }}'"/>
+          <span class="c-badge">
+            {%- if c.price < 1500 %}Budget{%- elif c.price >= 5000 %}Luxury{%- elif c.price >= 3000 %}Premium{%- else %}Popular{%- endif %}
+          </span>
+          <span class="c-pax-badge">👥 {{ c.max_guests or 2 }} pax</span>
+        </div>
+        <div class="c-card-body">
+          <h3 class="c-name">{{ c.name }}</h3>
+          <p class="c-inc">{{ c.inclusions }}</p>
+          <div class="c-footer">
+            <div class="c-price" aria-label="₱{{ '{:,.0f}'.format(c.price) }} per shift">
+              <span class="c-peso" aria-hidden="true">₱</span>
+              <span class="c-amount">{{ '{:,.0f}'.format(c.price) }}</span>
+              <span class="c-unit">/shift</span>
+            </div>
+            <a href="{{ url_for('guest.booking', cid=c.id) }}" class="btn btn-primary btn-sm" aria-label="Book {{ c.name }}">Book Now →</a>
+          </div>
+        </div>
+      </article>
+      {% else %}
+      <div class="no-results" style="grid-column:1/-1" role="status">
+        <p aria-hidden="true">🏗️</p><h3>No accommodations yet.</h3>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="no-results" id="noResults" style="display:none" role="status" aria-live="polite">
+      <p aria-hidden="true">🔍</p><h3>No results found.</h3><p>Try a different search or filter.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+window.AVAIL_URL = '{{ url_for("guest.check_availability") }}';
+document.getElementById('availDate').min   = new Date().toISOString().split('T')[0];
+document.getElementById('availDate').value = new Date().toISOString().split('T')[0];
+window.TODAY = '{{ today if today is defined else "" }}';
+
+document.querySelectorAll('.fchip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.fchip').forEach(c => c.setAttribute('aria-pressed','false'));
+    chip.setAttribute('aria-pressed','true');
+  });
+});
+</script>
+{% endblock %}

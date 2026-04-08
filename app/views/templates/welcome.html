@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+{% block title %}Paradise Resort — Welcome{% endblock %}
+{% block body %}
+<div class="hero">
+  <div class="hero-bg" style="background-image:url('{{ url_for('static',filename='images/welcome.jpg') }}')"></div>
+  <div class="hero-overlay"></div>
+  <div class="hero-particles" id="particles"></div>
+
+  <nav class="hero-nav" role="navigation" aria-label="Main navigation">
+    <div class="hero-nav-brand">🌴 Paradise Resort</div>
+    <a href="{{ url_for('auth.login') }}" class="btn btn-outline-white">Login / Register</a>
+  </nav>
+
+  <div class="hero-body">
+    <p class="hero-eyebrow">✦ Est. 2024 · Surigao del Sur ✦</p>
+    <h1 class="hero-title">
+      <span>Paradise</span>
+      <span class="gold">Resort</span>
+    </h1>
+    <p class="hero-tagline">Relax · Refresh · Reconnect</p>
+    <div class="hero-actions">
+      <a href="{{ url_for('auth.login') }}" class="btn btn-primary btn-lg">🌴 Book Your Stay</a>
+      <a href="#showcase" class="btn btn-glass btn-lg">Explore →</a>
+    </div>
+    <div class="hero-pills">
+      <span class="pill">🏖️ 7 Accommodations</span>
+      <span class="pill">🌅 Day &amp; Night Tours</span>
+      <span class="pill">💸 Full Refund on Cancel</span>
+      <span class="pill">📋 Instant Booking</span>
+    </div>
+  </div>
+  <div class="hero-scroll-hint" aria-hidden="true"><div class="scroll-dot"></div><span>Scroll</span></div>
+</div>
+
+<!-- Showcase -->
+<section class="showcase" id="showcase" aria-label="Our accommodations">
+  <div class="section-head">
+    <h2 class="section-title">Our <em>Accommodations</em></h2>
+    <p class="section-sub">Handcrafted spaces for every occasion</p>
+  </div>
+  <div class="showcase-grid">
+    <div class="showcase-item" style="background-image:url('{{ url_for('static',filename='images/suite.jpg') }}')" role="img" aria-label="Grand Suite — ₱8,000 per shift">
+      <div class="showcase-item-info"><strong>Grand Suite</strong><span>₱8,000/shift</span></div>
+    </div>
+    <div class="showcase-item" style="background-image:url('{{ url_for('static',filename='images/villa_sunset.jpg') }}')" role="img" aria-label="Modern Villa — ₱3,500 per shift">
+      <div class="showcase-item-info"><strong>Modern Villa</strong><span>₱3,500/shift</span></div>
+    </div>
+    <div class="showcase-item" style="background-image:url('{{ url_for('static',filename='images/couple_room.jpg') }}')" role="img" aria-label="Couple Deluxe — ₱2,500 per shift">
+      <div class="showcase-item-info"><strong>Couple Deluxe</strong><span>₱2,500/shift</span></div>
+    </div>
+    <div class="showcase-item" style="background-image:url('{{ url_for('static',filename='images/dorm.jpg') }}')" role="img" aria-label="Barkada Dorm — ₱4,500 per shift">
+      <div class="showcase-item-info"><strong>Barkada Dorm</strong><span>₱4,500/shift</span></div>
+    </div>
+    <div class="showcase-item" style="background-image:url('{{ url_for('static',filename='images/kubo_a.jpg') }}')" role="img" aria-label="Bahay Kubo A — ₱1,500 per shift">
+      <div class="showcase-item-info"><strong>Bahay Kubo A</strong><span>₱1,500/shift</span></div>
+    </div>
+    <div class="showcase-item" style="background-image:url('{{ url_for('static',filename='images/umbrella.jpg') }}')" role="img" aria-label="Poolside — ₱500 per shift">
+      <div class="showcase-item-info"><strong>Poolside</strong><span>₱500/shift</span></div>
+    </div>
+  </div>
+  <div class="text-center" style="margin-top:2.5rem">
+    <a href="{{ url_for('auth.login') }}" class="btn btn-primary btn-lg">Start Booking →</a>
+  </div>
+</section>
+
+<!-- Features -->
+<section class="features" aria-label="Why choose us">
+  <div class="section-head">
+    <h2 class="section-title">Why Choose <em>Us</em></h2>
+  </div>
+  <div class="features-grid">
+    <div class="feature-card"><div class="feature-icon" aria-hidden="true">🏖️</div><h3>Prime Location</h3><p>Beachfront property with stunning views and direct water access.</p></div>
+    <div class="feature-card"><div class="feature-icon" aria-hidden="true">⚡</div><h3>Instant Booking</h3><p>Book your accommodation online in seconds with instant confirmation.</p></div>
+    <div class="feature-card"><div class="feature-icon" aria-hidden="true">💸</div><h3>Full Refund Policy</h3><p>Cancel anytime and receive a full refund within 3–5 business days — no questions asked.</p></div>
+    <div class="feature-card"><div class="feature-icon" aria-hidden="true">🌅</div><h3>Day &amp; Night Tours</h3><p>Choose daytime (8am–5pm) or evening (6pm–12mn) for only +₱500.</p></div>
+  </div>
+</section>
+
+<!-- Contact / About -->
+<section class="contact-section" id="contact" aria-label="Contact and location">
+  <div class="section-head">
+    <h2 class="section-title">Find <em>Us</em></h2>
+    <p class="section-sub">We'd love to welcome you to paradise</p>
+  </div>
+  <div class="contact-grid">
+    <div class="contact-card">
+      <div class="contact-icon" aria-hidden="true">📍</div>
+      <h3>Location</h3>
+      <p>Surigao del Sur, Caraga Region, Philippines</p>
+    </div>
+    <div class="contact-card">
+      <div class="contact-icon" aria-hidden="true">🕐</div>
+      <h3>Operating Hours</h3>
+      <p>Day Tour: 8:00 AM – 5:00 PM<br>Night Tour: 6:00 PM – 12:00 MN</p>
+    </div>
+    <div class="contact-card">
+      <div class="contact-icon" aria-hidden="true">💳</div>
+      <h3>Payments Accepted</h3>
+      <p>Cash (walk-in) · GCash · Bank Transfer</p>
+    </div>
+    <div class="contact-card">
+      <div class="contact-icon" aria-hidden="true">💸</div>
+      <h3>Cancellation &amp; Refund</h3>
+      <p>Cancel anytime for a <strong>full refund</strong>. Refunds are processed within 3–5 business days.</p>
+    </div>
+  </div>
+</section>
+
+<footer class="site-footer" role="contentinfo">
+  <div class="footer-inner">
+    <div class="footer-brand">🌴 Paradise Resort</div>
+    <p class="footer-copy">© <span id="footerYear"></span> Paradise Resort. All rights reserved.</p>
+    <a href="{{ url_for('auth.login') }}" class="btn btn-primary">Book Now</a>
+  </div>
+</footer>
+
+<script>
+document.getElementById('footerYear').textContent = new Date().getFullYear();
+</script>
+{% endblock %}

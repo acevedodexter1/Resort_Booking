@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+{% block title %}My Bookings — Paradise Resort{% endblock %}
+{% block body %}
+<div class="app">
+  <div class="sb-backdrop" id="sbBackdrop"></div>
+  <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+    <div class="sb-top"><div class="sb-brand">🌴 Paradise</div><button class="sb-close" id="sbClose" type="button" aria-label="Close menu">✕</button></div>
+    <nav class="sb-nav">
+      <a href="{{ url_for('guest.dashboard') }}" class="sb-link"><span aria-hidden="true">🏖️</span> Accommodations</a>
+      <a href="{{ url_for('guest.my_bookings') }}" class="sb-link active" aria-current="page"><span aria-hidden="true">📋</span> My Bookings</a>
+      <a href="{{ url_for('auth.profile') }}" class="sb-link"><span aria-hidden="true">👤</span> My Profile</a>
+    </nav>
+    <div class="sb-footer">
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode">🌙 Dark Mode</button>
+      <div class="sb-user">
+        <div class="sb-avatar" aria-hidden="true">{{ user[0].upper() }}</div>
+        <div class="sb-user-info"><strong>{{ user }}</strong><small>Guest Account</small></div>
+      </div>
+      <a href="{{ url_for('auth.logout') }}" class="btn btn-danger btn-sm btn-full" aria-label="Logout">🚪 Logout</a>
+    </div>
+  </aside>
+
+  <div class="app-main" id="main-content">
+    <header class="app-header">
+      <button class="hamburger" id="menuBtn" type="button" aria-label="Open menu" aria-expanded="false"><span></span><span></span><span></span></button>
+      <div class="app-header-info">
+        <h1>My <em>Bookings</em></h1>
+        <p>{{ bookings|length }} reservation{{ 's' if bookings|length != 1 }}</p>
+      </div>
+    </header>
+
+    <div class="page-body">
+      {% if not bookings %}
+      <div class="no-results">
+        <div class="no-results-icon" aria-hidden="true">🏖️</div>
+        <h3>No bookings yet!</h3>
+        <p>Start planning your paradise getaway.</p>
+        <a href="{{ url_for('guest.dashboard') }}" class="btn btn-primary" style="margin-top:1.25rem">Browse Accommodations →</a>
+      </div>
+      {% else %}
+      <div class="booking-list" role="list" aria-label="Your bookings">
+        {% for b in bookings %}
+        <div class="bk-row {% if b.status == 'cancelled' %}bk-row-cancelled{% endif %}" id="bk-{{ b.id }}" role="listitem">
+          <img class="bk-img" src="{{ url_for('static', filename='images/' + b.image_path) }}" alt="{{ b.cottage_name }}" loading="lazy" onerror="this.src='{{ url_for('static', filename='images/welcome.jpg') }}'"/>
+          <div class="bk-info">
+            <h4>{{ b.cottage_name }}</h4>
+            <div class="bk-meta">
+              <span>📅 {{ b.date }}</span>
+              <span>🕐 {{ 'Day Tour' if 'Day' in b.shift else 'Night Tour' }}</span>
+              <span>💳 {{ b.payment_method|title }}</span>
+              {% if b.num_guests %}<span>👥 {{ b.num_guests }} pax</span>{% endif %}
+            </div>
+            {% if b.reference_no %}<p class="bk-ref">Ref: {{ b.reference_no }}</p>{% endif %}
+          </div>
+          <div class="bk-right">
+            <div class="bk-total">₱{{ '{:,.0f}'.format(b.total_price) }}</div>
+            <span class="bk-badge bk-{{ b.status }}" role="status">{{ b.status|title }}</span>
+            {% if b.status == 'confirmed' %}
+            <div class="bk-actions">
+              <button type="button" class="btn btn-outline btn-sm reschedule-btn"
+                      data-id="{{ b.id }}"
+                      data-cottage="{{ b.cottage_name }}"
+                      data-cid="{{ b.cottage_id }}"
+                      data-date="{{ b.date }}"
+                      data-shift="{{ b.shift }}"
+                      data-price="{{ b.total_price }}"
+                      aria-label="Reschedule booking for {{ b.cottage_name }}">
+                📅 Reschedule
+              </button>
+              <button type="button" class="btn btn-danger btn-sm cancel-btn"
+                      data-id="{{ b.id }}"
+                      data-cottage="{{ b.cottage_name }}"
+                      data-date="{{ b.date }}"
+                      data-total="{{ b.total_price }}"
+                      data-url="{{ url_for('guest.cancel_booking', rid=b.id) }}"
+                      aria-label="Cancel booking for {{ b.cottage_name }}">
+                ✕ Cancel
+              </button>
+            </div>
+            {% endif %}
+            {% if b.status == 'confirmed' and not b.has_review %}
+            <button type="button" class="btn btn-ghost btn-sm review-btn"
+                    data-id="{{ b.id }}"
+                    data-cottage="{{ b.cottage_name }}"
+                    aria-label="Leave a review for {{ b.cottage_name }}">
+              ⭐ Leave Review
+            </button>
+            {% elif b.has_review %}
+            <span style="font-size:.75rem;color:var(--g2)" aria-label="You have reviewed this booking">✅ Reviewed</span>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- ===== CANCEL BOOKING MODAL — WITH REFUND ===== -->
+<div class="modal-bg" id="cancelModal" role="dialog" aria-modal="true" aria-labelledby="cancelModalTitle">
+  <div class="modal-box" style="max-width:440px">
+    <div style="text-align:center;font-size:2.5rem;margin-bottom:.75rem" aria-hidden="true">🔄</div>
+    <h3 id="cancelModalTitle" style="text-align:center;margin-bottom:.4rem;font-family:var(--fd)">Cancel Booking?</h3>
+    <p id="cancelModalSubtitle" style="text-align:center;font-size:.85rem;color:var(--t1);margin-bottom:1.1rem"></p>
+
+    <!-- Refund info box -->
+    <div class="refund-info-box">
+      <div class="refund-info-title">
+        <span aria-hidden="true">💸</span> Refund Policy
+      </div>
+      <p class="refund-info-text">
+        Your payment will be <strong>fully refunded</strong> after cancellation.
+        Please allow <strong>3–5 business days</strong> for the refund to reflect
+        depending on your payment method (GCash / Bank Transfer / Cash return at front desk).
+      </p>
+    </div>
+
+    <div class="cancel-modal-actions">
+      <button type="button" id="cancelConfirmBtn" class="btn btn-danger" style="flex:1">
+        <span class="btn-label">Yes, Cancel &amp; Refund</span>
+        <span class="btn-spin" style="display:none">⏳</span>
+      </button>
+      <button type="button" id="cancelModalClose" class="btn btn-ghost" style="flex:1">Keep Booking</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reschedule Modal -->
+<div class="modal-bg" id="rescheduleModal" role="dialog" aria-modal="true" aria-labelledby="rescheduleModalTitle">
+  <div class="modal-box">
+    <h3 id="rescheduleModalTitle" style="margin-bottom:1rem">📅 Reschedule Booking</h3>
+    <p id="rescheduleTitle" style="color:var(--t1);margin-bottom:1.25rem;font-size:.9rem"></p>
+    <div class="field-group">
+      <label class="field-label" for="newDate">New Date</label>
+      <input type="date" id="newDate" class="field-inp"/>
+    </div>
+    <div class="field-group">
+      <label class="field-label" for="newShift">New Shift</label>
+      <select id="newShift" class="field-inp">
+        <option value="Day Tour (8am-5pm)">Day Tour (8am–5pm)</option>
+        <option value="Night Tour (6pm-12mn)">Night Tour (6pm–12mn) +₱500</option>
+      </select>
+    </div>
+    <div id="rescheduleErr" class="err-box" style="display:none"></div>
+    <div style="display:flex;gap:.75rem;margin-top:1rem">
+      <button type="button" id="rescheduleConfirm" class="btn btn-primary" style="flex:1">
+        <span class="btn-label">Confirm Reschedule</span>
+        <span class="btn-spin" style="display:none">⏳</span>
+      </button>
+      <button type="button" id="rescheduleClose" class="btn btn-ghost" style="flex:1">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Review Modal -->
+<div class="modal-bg" id="reviewModal" role="dialog" aria-modal="true" aria-labelledby="reviewModalTitle">
+  <div class="modal-box">
+    <h3 id="reviewModalTitle" style="margin-bottom:.5rem">⭐ Leave a Review</h3>
+    <p id="reviewTitle" style="color:var(--t1);margin-bottom:1.25rem;font-size:.9rem"></p>
+    <div class="field-group">
+      <label class="field-label">Rating</label>
+      <div class="star-picker" id="starPicker" role="group" aria-label="Star rating">
+        {% for i in range(1,6) %}
+        <button type="button" class="star-btn" data-val="{{ i }}" aria-label="{{ i }} star{{ 's' if i > 1 }}">☆</button>
+        {% endfor %}
+      </div>
+      <input type="hidden" id="selectedRating" value="0"/>
+    </div>
+    <div class="field-group">
+      <label class="field-label" for="reviewComment">Comment <span style="color:var(--t1);font-weight:400">(optional)</span></label>
+      <textarea id="reviewComment" class="field-inp" rows="3" placeholder="Share your experience…" style="resize:vertical"></textarea>
+    </div>
+    <div id="reviewErr" class="err-box" style="display:none"></div>
+    <div style="display:flex;gap:.75rem;margin-top:1rem">
+      <button type="button" id="reviewConfirm" class="btn btn-primary" style="flex:1">
+        <span class="btn-label">Submit Review</span>
+        <span class="btn-spin" style="display:none">⏳</span>
+      </button>
+      <button type="button" id="reviewClose" class="btn btn-ghost" style="flex:1">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+window.CSRF            = '{{ csrf_token() }}';
+window.RESCHEDULE_BASE = '/guest/booking/reschedule/';
+window.REVIEW_BASE     = '/guest/review/';
+</script>
+{% endblock %}
